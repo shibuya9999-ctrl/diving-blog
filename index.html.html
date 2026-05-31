@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEEP DIVE — Underwater Vlog</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #1565c0;
+    --emerald: #1e88e5;
+    --deep: #000814;
+    --midnight: #000510;
+    --surface: #010f2a;
+    --glass: rgba(21,101,192,0.08);
+    --glow: 0 0 40px rgba(21,101,192,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--midnight);
+    color: #b8ccf0;
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    width: 12px; height: 12px;
+    background: var(--teal);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.15s ease, opacity 0.2s;
+    transform: translate(-50%, -50%);
+    mix-blend-mode: screen;
+  }
+  .cursor-ring {
+    width: 36px; height: 36px;
+    border: 1px solid rgba(21,101,192,0.6);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    transition: transform 0.35s ease, width 0.3s, height 0.3s;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.6;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 48px;
+    background: linear-gradient(to bottom, rgba(3,18,18,0.9), transparent);
+    backdrop-filter: blur(2px);
+  }
+  .nav-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.16rem;
+    letter-spacing: 0.15em;
+    color: var(--teal);
+    text-shadow: var(--glow);
+  }
+  .nav-links {
+    display: flex;
+    gap: 40px;
+    list-style: none;
+  }
+  .nav-links a {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(200,240,236,0.6);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+  .nav-links a:hover { color: #1e88e5; }
+
+  /* HERO */
+  .hero {
+    height: 100vh;
+    position: relative;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 60% 40%, rgba(21,101,192,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 20% 80%, rgba(30,136,229,0.12) 0%, transparent 50%),
+      linear-gradient(180deg, var(--midnight) 0%, var(--deep) 50%, #000a1a 100%);
+  }
+
+  /* Bubble animation */
+  .bubbles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(21,101,192,0.3);
+    animation: rise linear infinite;
+    bottom: -100px;
+  }
+  @keyframes rise {
+    to { transform: translateY(-110vh) translateX(30px); opacity: 0; }
+  }
+  .bubble:nth-child(1)  { width:8px;  height:8px;  left:10%; animation-duration:8s;  animation-delay:0s;   opacity:0.4; }
+  .bubble:nth-child(2)  { width:14px; height:14px; left:25%; animation-duration:12s; animation-delay:2s;   opacity:0.25; }
+  .bubble:nth-child(3)  { width:6px;  height:6px;  left:40%; animation-duration:9s;  animation-delay:1s;   opacity:0.5; }
+  .bubble:nth-child(4)  { width:18px; height:18px; left:55%; animation-duration:14s; animation-delay:4s;   opacity:0.2; }
+  .bubble:nth-child(5)  { width:10px; height:10px; left:70%; animation-duration:10s; animation-delay:0.5s; opacity:0.35; }
+  .bubble:nth-child(6)  { width:5px;  height:5px;  left:82%; animation-duration:7s;  animation-delay:3s;   opacity:0.45; }
+  .bubble:nth-child(7)  { width:12px; height:12px; left:90%; animation-duration:11s; animation-delay:1.5s; opacity:0.3; }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 0 48px;
+    max-width: 800px;
+  }
+
+  .hero-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.2s forwards;
+  }
+
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(5rem, 12vw, 11rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: #fff;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.4s forwards;
+  }
+  .hero-title span {
+    display: block;
+    color: transparent;
+    -webkit-text-stroke: 1px var(--teal);
+    text-shadow: none;
+  }
+
+  .hero-sub {
+    margin-top: 32px;
+    font-size: 1rem;
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(200,240,236,0.6);
+    line-height: 1.7;
+    max-width: 420px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.6s forwards;
+  }
+
+  .hero-cta {
+    margin-top: 48px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.8s forwards;
+  }
+
+  .btn-primary {
+    background: var(--teal);
+    color: var(--midnight);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 14px 32px;
+    border: none;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  .btn-primary:hover {
+    background: #1e88e5;
+    box-shadow: 0 0 40px rgba(21,101,192,0.6);
+    transform: translateY(-2px);
+  }
+
+  .hero-scroll {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    color: rgba(200,240,236,0.4);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hero-scroll::before {
+    content: '';
+    width: 40px;
+    height: 1px;
+    background: rgba(21,101,192,0.5);
+  }
+
+  /* Depth meter decoration */
+  .depth-meter {
+    position: absolute;
+    right: 48px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    animation: fadeIn 1s ease 1s forwards;
+  }
+  .depth-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(21,101,192,0.6);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+  .depth-line {
+    width: 1px;
+    height: 200px;
+    background: linear-gradient(to bottom, transparent, #1565c0, transparent);
+    position: relative;
+  }
+  .depth-tick {
+    position: absolute;
+    left: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    color: rgba(21,101,192,0.5);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+
+  /* SECTION BASE */
+  section {
+    padding: 120px 48px;
+    position: relative;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.4em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    line-height: 1;
+    color: #fff;
+    letter-spacing: 0.03em;
+  }
+
+  /* LATEST VLOG */
+  .vlog-section {
+    background: linear-gradient(180deg, var(--midnight) 0%, #000814 100%);
+  }
+
+  .vlog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 64px;
+  }
+
+  .vlog-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 2px;
+  }
+
+  .vlog-main {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .vlog-main .video-wrapper {
+    aspect-ratio: 16/9;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vlog-main iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  .vlog-info {
+    padding: 28px 32px;
+    background: var(--surface);
+  }
+
+  .vlog-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--teal);
+    margin-bottom: 12px;
+  }
+
+  .vlog-title-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.05em;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+
+  .vlog-desc {
+    font-size: 0.85rem;
+    font-weight: 300;
+    color: rgba(200,240,236,0.5);
+    line-height: 1.7;
+  }
+
+  .vlog-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .vlog-card {
+    background: var(--surface);
+    padding: 20px 24px;
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    transition: background 0.3s;
+    cursor: pointer;
+  }
+  .vlog-card:hover { background: rgba(21,101,192,0.1); }
+
+  .vlog-card-thumb {
+    width: 80px;
+    height: 56px;
+    background: linear-gradient(135deg, rgba(21,101,192,0.25), rgba(30,136,229,0.12));
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .play-icon {
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 14px solid #1565c0;
+    margin-left: 3px;
+  }
+
+  .vlog-card-info .vlog-date { margin-bottom: 6px; }
+
+  .vlog-card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    font-size: 0.88rem;
+    color: rgba(200,240,236,0.8);
+    line-height: 1.4;
+  }
+
+  /* PHOTO GALLERY */
+  .gallery-section {
+    background: var(--midnight);
+  }
+
+  .gallery-grid {
+    margin-top: 64px;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(3, 220px);
+    gap: 3px;
+  }
+
+  .gallery-item {
+    overflow: hidden;
+    position: relative;
+    background: var(--surface);
+  }
+
+  .gallery-item::before {
+    content: attr(data-label);
+    position: absolute;
+    bottom: 12px;
+    left: 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(200,240,236,0.7);
+    z-index: 2;
+    text-transform: uppercase;
+  }
+
+  .gallery-item::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(3,18,18,0.8) 0%, transparent 50%);
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .gallery-item:hover::after { opacity: 1; }
+
+  .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+    filter: saturate(0.7) brightness(0.85);
+  }
+  .gallery-item:hover img {
+    transform: scale(1.05);
+    filter: saturate(1.1) brightness(1);
+  }
+
+  /* Layout spans */
+  .g1  { grid-column: 1/5;  grid-row: 1/2; }
+  .g2  { grid-column: 5/8;  grid-row: 1/3; }
+  .g3  { grid-column: 8/13; grid-row: 1/2; }
+  .g4  { grid-column: 1/4;  grid-row: 2/4; }
+  .g5  { grid-column: 4/5;  grid-row: 2/3; }
+  .g6  { grid-column: 8/10; grid-row: 2/3; }
+  .g7  { grid-column: 10/13;grid-row: 2/4; }
+  .g8  { grid-column: 4/8;  grid-row: 3/4; }
+  .g9  { grid-column: 8/10; grid-row: 3/4; }
+
+  /* Placeholder image styles for demo */
+  .img-placeholder {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .img-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--gradient);
+  }
+
+  /* Gallery placeholder images using CSS gradients */
+  .ph-1 { background: linear-gradient(135deg, #000814 0%, #001a40 40%, #003080 100%); }
+  .ph-2 { background: linear-gradient(160deg, #000510 0%, #001235 50%, #002a6e 100%); }
+  .ph-3 { background: linear-gradient(120deg, #000610 0%, #001540 60%, #002d75 100%); }
+  .ph-4 { background: linear-gradient(200deg, #000814 0%, #001840 50%, #003580 100%); }
+  .ph-5 { background: linear-gradient(145deg, #000510 0%, #001030 60%, #002060 100%); }
+  .ph-6 { background: linear-gradient(165deg, #000610 0%, #001238 50%, #002a70 100%); }
+  .ph-7 { background: linear-gradient(130deg, #000408 0%, #000e28 60%, #001e55 100%); }
+  .ph-8 { background: linear-gradient(155deg, #000610 0%, #001230 55%, #002868 100%); }
+  .ph-9 { background: linear-gradient(175deg, #000510 0%, #001030 55%, #003070 100%); }
+
+  /* Fish / coral decorative SVG overlays in placeholders */
+  .ph-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    opacity: 0.15;
+    color: var(--teal);
+  }
+
+  /* ABOUT */
+  .about-section {
+    background: linear-gradient(180deg, var(--midnight) 0%, #000a18 100%);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .about-visual {
+    position: relative;
+    height: 520px;
+  }
+
+  .about-card {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, #000d30, #000510);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .about-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 70% 30%, rgba(21,101,192,0.2) 0%, transparent 50%),
+      radial-gradient(circle at 20% 80%, rgba(30,136,229,0.14) 0%, transparent 40%);
+  }
+
+  .about-avatar {
+    font-size: 8rem;
+    opacity: 0.4;
+    filter: drop-shadow(0 0 30px rgba(0,196,180,0.5));
+  }
+
+  .about-stats {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: rgba(3,18,18,0.8);
+    backdrop-filter: blur(10px);
+  }
+
+  .stat {
+    padding: 24px 20px;
+    text-align: center;
+    border-right: 1px solid rgba(21,101,192,0.2);
+  }
+  .stat:last-child { border-right: none; }
+
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    color: var(--teal);
+    line-height: 1;
+    text-shadow: var(--glow);
+  }
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(200,240,236,0.4);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .about-text .section-title { margin-bottom: 28px; }
+
+  .about-text p {
+    font-size: 0.95rem;
+    font-weight: 300;
+    color: rgba(200,240,236,0.6);
+    line-height: 1.9;
+    margin-bottom: 20px;
+  }
+
+  .about-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 32px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    padding: 8px 16px;
+    border: 1px solid rgba(21,101,192,0.4);
+    color: var(--teal);
+    text-transform: uppercase;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  }
+
+  /* DIVIDER */
+  .wave-divider {
+    height: 2px;
+    background: linear-gradient(to right, transparent, #1565c0, transparent);
+    opacity: 0.3;
+    margin: 0 48px;
+  }
+
+  /* FOOTER */
+  footer {
+    background: var(--midnight);
+    padding: 60px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(21,101,192,0.15);
+  }
+
+  .footer-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--teal);
+    letter-spacing: 0.1em;
+    text-shadow: var(--glow);
+  }
+
+  .footer-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: rgba(200,240,236,0.3);
+    text-transform: uppercase;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 28px;
+  }
+  .footer-links a {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(200,240,236,0.4);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+  .footer-links a:hover { color: #1e88e5; }
+
+  /* SCROLL REVEAL */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">DEEP DIVE</div>
+  <ul class="nav-links">
+    <li><a href="#vlog">Vlog</a></li>
+    <li><a href="#gallery">Gallery</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="bubbles">
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+  </div>
+
+  <div class="hero-content">
+    <p class="hero-eyebrow">// Underwater Journal</p>
+    <h1 class="hero-title">
+      DEEP<br>
+      <span>DIVE</span>
+    </h1>
+    <p class="hero-sub">水面の下に広がる、もうひとつの世界へ。<br>ダイビングの記録と海の記憶を綴るビジュアルログ。</p>
+    <div class="hero-cta">
+      <a href="#vlog" class="btn-primary">Latest Vlog</a>
+      <span class="hero-scroll">Scroll to explore</span>
+    </div>
+  </div>
+
+  <div class="depth-meter">
+    <div class="depth-line">
+      <span class="depth-tick" style="top:0">0m</span>
+      <span class="depth-tick" style="top:60px">10m</span>
+      <span class="depth-tick" style="top:120px">20m</span>
+      <span class="depth-tick" style="top:180px">30m</span>
+    </div>
+    <div class="depth-label">DEPTH</div>
+  </div>
+</section>
+
+<!-- VLOG SECTION -->
+<section class="vlog-section" id="vlog">
+  <div class="vlog-header reveal">
+    <div>
+      <p class="section-label">// Latest Episodes</p>
+      <h2 class="section-title">VLOG</h2>
+    </div>
+    <a href="#" style="font-family:'Space Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;color:var(--teal);text-decoration:none;text-transform:uppercase;">All Episodes →</a>
+  </div>
+
+  <div class="vlog-grid reveal">
+    <!-- Main featured video -->
+    <div class="vlog-main">
+      <div class="video-wrapper">
+        <!-- Replace src with your YouTube embed URL -->
+        <iframe
+          src="https://www.youtube.com/embed/ZYUrryePo-g"
+          title="Diving Vlog"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+      <div class="vlog-info">
+        <p class="vlog-date">2026.05.15 — Cozumel, Mexico</p>
+        <h3 class="vlog-title-text">PALANCAR REEF — 水深28mの世界</h3>
+        <p class="vlog-desc">コスメルの名ダイブスポット、パランカールリーフ。透明度抜群の青い海の中、巨大なカリブ海のサンゴ礁を漂いながら感じた静寂と美しさを記録。</p>
+      </div>
+    </div>
+
+    <!-- Sidebar videos -->
+    <div class="vlog-sidebar">
+      <div class="vlog-card">
+        <div class="vlog-card-thumb"><div class="play-icon"></div></div>
+        <div class="vlog-card-info">
+          <p class="vlog-date">2026.04.02 — Okinawa</p>
+          <p class="vlog-card-title">万座毛ドリフトダイブ — 黒潮の流れに身を任せて</p>
+        </div>
+      </div>
+      <div class="vlog-card">
+        <div class="vlog-card-thumb"><div class="play-icon"></div></div>
+        <div class="vlog-card-info">
+          <p class="vlog-date">2026.03.10 — Palau</p>
+          <p class="vlog-card-title">Jellyfish Lake — 無毒のクラゲと泳ぐ幻想体験</p>
+        </div>
+      </div>
+      <div class="vlog-card">
+        <div class="vlog-card-thumb"><div class="play-icon"></div></div>
+        <div class="vlog-card-info">
+          <p class="vlog-date">2026.02.18 — Maldives</p>
+          <p class="vlog-card-title">マンタポイント — ナイトダイブで出会ったジャイアントマンタ</p>
+        </div>
+      </div>
+      <div class="vlog-card">
+        <div class="vlog-card-thumb"><div class="play-icon"></div></div>
+        <div class="vlog-card-info">
+          <p class="vlog-date">2026.01.05 — Thailand</p>
+          <p class="vlog-card-title">シミラン諸島 — タイガーシャークとの遭遇記</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave-divider"></div>
+
+<!-- GALLERY -->
+<section class="gallery-section" id="gallery">
+  <div class="reveal">
+    <p class="section-label">// Underwater Shots</p>
+    <h2 class="section-title">GALLERY</h2>
+  </div>
+
+  <div class="gallery-grid reveal">
+    <div class="gallery-item g1" data-label="Cozumel / 28m">
+      <div class="img-placeholder ph-1">
+        <div class="ph-overlay">🐠</div>
+      </div>
+    </div>
+    <div class="gallery-item g2" data-label="Palau / 15m">
+      <div class="img-placeholder ph-2">
+        <div class="ph-overlay">🪸</div>
+      </div>
+    </div>
+    <div class="gallery-item g3" data-label="Okinawa / 8m">
+      <div class="img-placeholder ph-3">
+        <div class="ph-overlay">🐢</div>
+      </div>
+    </div>
+    <div class="gallery-item g4" data-label="Maldives / 20m">
+      <div class="img-placeholder ph-4">
+        <div class="ph-overlay">🦈</div>
+      </div>
+    </div>
+    <div class="gallery-item g5" data-label="Thailand / 12m">
+      <div class="img-placeholder ph-5">
+        <div class="ph-overlay">🐙</div>
+      </div>
+    </div>
+    <div class="gallery-item g6" data-label="Bali / 18m">
+      <div class="img-placeholder ph-6">
+        <div class="ph-overlay">🦑</div>
+      </div>
+    </div>
+    <div class="gallery-item g7" data-label="Philippines / 10m">
+      <div class="img-placeholder ph-7">
+        <div class="ph-overlay">🐡</div>
+      </div>
+    </div>
+    <div class="gallery-item g8" data-label="Hawaii / 22m">
+      <div class="img-placeholder ph-8">
+        <div class="ph-overlay">🐬</div>
+      </div>
+    </div>
+    <div class="gallery-item g9" data-label="Japan / 5m">
+      <div class="img-placeholder ph-9">
+        <div class="ph-overlay">🦀</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave-divider"></div>
+
+<!-- ABOUT -->
+<section class="about-section" id="about">
+  <div class="about-visual reveal">
+    <div class="about-card">
+      <div class="about-avatar">🤿</div>
+      <div class="about-stats">
+        <div class="stat">
+          <div class="stat-num">247</div>
+          <div class="stat-label">Dives</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">18</div>
+          <div class="stat-label">Countries</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">40m</div>
+          <div class="stat-label">Max Depth</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="about-text reveal">
+    <p class="section-label">// The Diver</p>
+    <h2 class="section-title">ABOUT<br>ME</h2>
+    <p>水中カメラを片手に世界中の海を潜り続けて10年。AOW・ナイトロックス認定ダイバー。海の美しさと静寂を、映像と写真で届けたい。</p>
+    <p>メキシコ・コスメル、沖縄、パラオ、モルディブ——どんな海にも、その海だけの顔がある。このブログはそんな出会いの記録です。</p>
+    <div class="about-tags">
+      <span class="tag">AOWD</span>
+      <span class="tag">Nitrox</span>
+      <span class="tag">Underwater Photo</span>
+      <span class="tag">Wreck Diving</span>
+      <span class="tag">Night Dive</span>
+      <span class="tag">Drift Dive</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">DEEP DIVE</div>
+  <p class="footer-text">© 2026 — Underwater Journal</p>
+  <div class="footer-links">
+    <a href="#">YouTube</a>
+    <a href="#">Instagram</a>
+    <a href="#">X / Twitter</a>
+  </div>
+</footer>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursor.style.left = mx + 'px';
+    cursor.style.top  = my + 'px';
+  });
+
+  function animRing() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(animRing);
+  }
+  animRing();
+
+  document.querySelectorAll('a, button, .vlog-card').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      ring.style.width = '56px';
+      ring.style.height = '56px';
+      cursor.style.transform = 'translate(-50%,-50%) scale(1.5)';
+    });
+    el.addEventListener('mouseleave', () => {
+      ring.style.width = '36px';
+      ring.style.height = '36px';
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+    });
+  });
+
+  // Scroll reveal
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
